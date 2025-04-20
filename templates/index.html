@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MapChat - Route Visualization</title>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            background-color: #f5f5f5;
+            overflow: hidden;
+        }
+        
+        .container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .sidebar {
+            width: 30%;
+            background-color: white;
+            background-image: linear-gradient(to bottom, #ffffff, #f8f9fa);
+            border-radius: 12px;
+            margin: 0.5rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.3s ease, width 0.3s ease, margin 0.3s ease;
+            overflow: hidden;
+            position: relative;
+            z-index: 5;
+            border: 1px solid rgba(0,0,0,0.05);
+        }
+        
+        .sidebar.hidden {
+            width: 0;
+            margin: 0;
+            transform: translateX(-100%);
+        }
+        
+        .sidebar-toggle-container {
+            display: flex;
+            border-bottom: 1px solid rgba(0,0,0,0.08);
+            background-color: #f8f9fa;
+            padding: 0.25rem;
+            gap: 0.25rem;
+        }
+        
+        .sidebar-toggle-btn {
+            flex: 1;
+            padding: 0.75rem;
+            text-align: center;
+            cursor: pointer;
+            background-color: transparent;
+            border: none;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            color: #555;
+        }
+        
+        .sidebar-toggle-btn:hover:not(.active) {
+            background-color: rgba(52, 152, 219, 0.1);
+        }
+        
+        .sidebar-toggle-btn.active {
+            background-color: #3498db;
+            color: white;
+            box-shadow: 0 2px 5px rgba(52, 152, 219, 0.3);
+        }
+        
+        /* Sidebar toggle handle that stays visible */
+        .sidebar-toggle-handle {
+            position: fixed;
+            top: 50%;
+            left: calc(30% + 0.5rem);
+            width: 36px;
+            height: 70px;
+            background-color: #3498db;
+            background-image: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 0 12px 12px 0;
+            cursor: pointer;
+            z-index: 100;
+            box-shadow: 3px 0 10px rgba(0,0,0,0.2);
+            transform: translateY(-50%);
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            font-size: 18px;
+            font-weight: bold;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-left: none;
+        }
+        
+        .sidebar-toggle-handle:hover {
+            background-image: linear-gradient(135deg, #2980b9, #2573a7);
+            width: 40px;
+        }
+        
+        .sidebar.hidden ~ .sidebar-toggle-handle {
+            left: 0;
+        }
+        
+        .sidebar-content {
+            flex: 1;
+            display: none;
+            flex-direction: column;
+            padding: 1.25rem;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: #ccc #f5f5f5;
+        }
+        
+        .sidebar-content::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .sidebar-content::-webkit-scrollbar-track {
+            background: #f5f5f5;
+            border-radius: 10px;
+        }
+        
+        .sidebar-content::-webkit-scrollbar-thumb {
+            background-color: #ccc;
+            border-radius: 10px;
+            border: 2px solid #f5f5f5;
+        }
+        
+        .sidebar-content.active {
+            display: flex;
+        }
+        
+        .map-container {
+            flex: 1;
+            margin: 0.5rem 0.5rem 0.5rem 0;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            transition: margin 0.3s ease;
+        }
+        
+        .map-container.expanded {
+            margin-left: 0.5rem;
+        }
+        
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+            border: 1px solid rgba(0,0,0,0.08);
+            border-radius: 8px;
+            background-color: #f9f9f9;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05) inset;
+            scrollbar-width: thin;
+            scrollbar-color: #ccc #f5f5f5;
+        }
+        
+        .chat-messages::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .chat-messages::-webkit-scrollbar-track {
+            background: #f5f5f5;
+            border-radius: 10px;
+        }
+        
+        .chat-messages::-webkit-scrollbar-thumb {
+            background-color: #ccc;
+            border-radius: 10px;
+            border: 2px solid #f5f5f5;
+        }
+        
+        .chat-message {
+            margin-bottom: 1rem;
+            padding: 0.75rem;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            line-height: 1.5;
+        }
+        
+        .chat-message.user {
+            background-color: #e1f5fe;
+            background-image: linear-gradient(to bottom, #e1f5fe, #d0f0fd);
+            align-self: flex-end;
+            margin-left: 2rem;
+            border-top-right-radius: 2px;
+            border: 1px solid rgba(52, 152, 219, 0.1);
+        }
+        
+        .chat-message.assistant {
+            background-color: #f5f5f5;
+            background-image: linear-gradient(to bottom, #f8f9fa, #f1f3f5);
+            align-self: flex-start;
+            margin-right: 2rem;
+            border-top-left-radius: 2px;
+            border: 1px solid rgba(0,0,0,0.05);
+        }
+        
+        .chat-input-container {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .chat-input {
+            flex: 1;
+            padding: 0.65rem 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            resize: none;
+            transition: all 0.2s ease;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05) inset;
+            font-size: 0.95rem;
+            font-family: inherit;
+            line-height: 1.5;
+        }
+        
+        .chat-input:focus {
+            border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+            outline: none;
+        }
+        
+        .chat-send-btn {
+            padding: 0.65rem 1.25rem;
+            background-color: #3498db;
+            background-image: linear-gradient(to bottom, #3498db, #2980b9);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            align-self: flex-end;
+        }
+        
+        .chat-send-btn:hover {
+            background-image: linear-gradient(to bottom, #2980b9, #2573a7);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            transform: translateY(-1px);
+        }
+        
+        .chat-send-btn:active {
+            transform: translateY(1px);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .chat-reset-btn {
+            margin-top: 0.75rem;
+            padding: 0.65rem;
+            background-color: #e74c3c;
+            background-image: linear-gradient(to bottom, #e74c3c, #c0392b);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: center;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .chat-reset-btn:hover {
+            background-image: linear-gradient(to bottom, #c0392b, #a93226);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            transform: translateY(-1px);
+        }
+        
+        .chat-reset-btn:active {
+            transform: translateY(1px);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .form-group {
+            margin-bottom: 1.25rem;
+            position: relative;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #333;
+            font-size: 0.95rem;
+        }
+        
+        input, select {
+            width: 100%;
+            padding: 0.65rem 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-sizing: border-box;
+            transition: all 0.2s ease;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05) inset;
+            font-size: 0.95rem;
+        }
+        
+        input:focus, select:focus {
+            border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+            outline: none;
+        }
+        
+        button {
+            background-color: #3498db;
+            background-image: linear-gradient(to bottom, #3498db, #2980b9);
+            color: white;
+            border: none;
+            padding: 0.65rem 1.25rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        button:hover {
+            background-image: linear-gradient(to bottom, #2980b9, #2573a7);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            transform: translateY(-1px);
+        }
+        
+        button:active {
+            transform: translateY(1px);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .waypoint {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+        
+        .waypoint input {
+            flex: 1;
+        }
+        
+        .remove-waypoint {
+            background-color: #e74c3c;
+        }
+        
+        .remove-waypoint:hover {
+            background-color: #c0392b;
+        }
+        
+        .add-waypoint {
+            width: 100%;
+            margin-top: 0.5rem;
+        }
+        
+        .results {
+            margin-top: 1.5rem;
+            padding: 1.25rem;
+            border-top: 1px solid rgba(0,0,0,0.08);
+            background-color: rgba(248, 249, 250, 0.5);
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        
+        .results h3 {
+            margin-top: 0;
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+        }
+        
+        .route-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+            font-weight: 600;
+            color: #333;
+            background-color: rgba(255, 255, 255, 0.7);
+            padding: 0.75rem;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid rgba(0,0,0,0.08);
+            margin-bottom: 1.25rem;
+            gap: 0.25rem;
+        }
+        
+        .tab {
+            padding: 0.65rem 1.25rem;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s ease;
+            color: #555;
+            font-weight: 500;
+            border-radius: 8px 8px 0 0;
+        }
+        
+        .tab:hover:not(.active) {
+            background-color: rgba(52, 152, 219, 0.05);
+            color: #333;
+        }
+        
+        .tab.active {
+            border-bottom: 2px solid #3498db;
+            font-weight: 600;
+            color: #3498db;
+            background-color: rgba(52, 152, 219, 0.1);
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .feature-list {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid rgba(0,0,0,0.08);
+            border-radius: 8px;
+            padding: 0.75rem;
+            background-color: #f9f9f9;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05) inset;
+            scrollbar-width: thin;
+            scrollbar-color: #ccc #f5f5f5;
+        }
+        
+        .feature-list::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .feature-list::-webkit-scrollbar-track {
+            background: #f5f5f5;
+            border-radius: 10px;
+        }
+        
+        .feature-list::-webkit-scrollbar-thumb {
+            background-color: #ccc;
+            border-radius: 10px;
+            border: 2px solid #f5f5f5;
+        }
+        
+        .feature-item {
+            padding: 0.5rem 0.75rem;
+            margin-bottom: 0.5rem;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+            border-radius: 4px;
+            transition: all 0.2s ease;
+            background-color: rgba(255,255,255,0.5);
+        }
+        
+        .feature-item:hover {
+            background-color: rgba(255,255,255,0.9);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        
+        .feature-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 1rem;
+            display: none;
+        }
+        
+        .error {
+            color: #e74c3c;
+            margin-top: 0.5rem;
+            font-size: 0.9rem;
+        }
+        
+        /* Typing cursor animation */
+        .typing-cursor {
+            display: inline-block;
+            width: 0.5rem;
+            color: #3498db;
+            font-weight: bold;
+            margin-left: 2px;
+            user-select: none; /* Prevent selection */
+            position: relative; /* Ensure it's positioned properly */
+            vertical-align: middle; /* Align with text */
+            background: transparent; /* Ensure background is transparent */
+        }
+        
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+        
+        .options-section {
+            border-top: 1px solid rgba(0,0,0,0.08);
+            padding-top: 1.25rem;
+            margin-top: 1.25rem;
+            background-color: rgba(248, 249, 250, 0.5);
+            border-radius: 8px;
+            padding: 1.25rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        
+        .options-section h3 {
+            margin-top: 0;
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+        }
+        
+        
+        .coordinates {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 0.25rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-toggle-container">
+                <button class="sidebar-toggle-btn active" id="info-toggle">Info</button>
+                <button class="sidebar-toggle-btn" id="chat-toggle">Chat</button>
+            </div>
+            
+            <div class="sidebar-content active" id="info-content">
+                <form id="route-form">
+                    <div class="form-group">
+                        <label for="origin">Origin:</label>
+                        <input type="text" id="origin" placeholder="Enter origin address" required>
+                        <div class="coordinates" id="origin-coords"></div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="destination">Destination:</label>
+                        <input type="text" id="destination" placeholder="Enter destination address" required>
+                        <div class="coordinates" id="destination-coords"></div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Waypoints:</label>
+                        <div id="waypoints-container"></div>
+                        <button type="button" class="add-waypoint" id="add-waypoint">+ Add Waypoint</button>
+                    </div>
+                    
+                    <div class="options-section">
+                        <h3>Options</h3>
+                        
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="sample-route" name="sample-route">
+                            <label for="sample-route">Sample Route</label>
+                        </div>
+                        
+                        <div id="sampling-options" style="display: none; margin-left: 1.5rem;">
+                            <div class="form-group">
+                                <label for="sample-method">Sampling Method:</label>
+                                <select id="sample-method">
+                                    <option value="interval">By Distance (km)</option>
+                                    <option value="nth">Every Nth Point</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group" id="interval-group">
+                                <label for="interval-km">Distance (km):</label>
+                                <input type="number" id="interval-km" value="5" min="1" max="100">
+                            </div>
+                            
+                            <div class="form-group" id="nth-group" style="display: none;">
+                                <label for="every-nth">Every Nth Point:</label>
+                                <input type="number" id="every-nth" value="10" min="2" max="100">
+                            </div>
+                        </div>
+                        
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="show-places" name="show-places">
+                            <label for="show-places">Show Places</label>
+                        </div>
+                        
+                        <div id="places-options" style="display: none; margin-left: 1.5rem;">
+                            <div class="form-group">
+                                <label for="places-radius">Search Radius (km):</label>
+                                <input type="range" id="places-radius" min="1" max="10" value="5" step="1">
+                                <span id="places-radius-value">5 km</span>
+                            </div>
+                        </div>
+                        
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="show-features" name="show-features">
+                            <label for="show-features">Show Natural Features</label>
+                        </div>
+                        
+                        <div id="features-options" style="display: none; margin-left: 1.5rem;">
+                            <div class="form-group">
+                                <label for="features-radius">Search Radius (km):</label>
+                                <input type="range" id="features-radius" min="0.5" max="2" value="1" step="0.5">
+                                <span id="features-radius-value">1 km</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" id="generate-route">Generate Route</button>
+                </form>
+                
+                <div class="loading" id="loading">
+                    <p>Loading...</p>
+                </div>
+                
+                <div class="results" id="results" style="display: none;">
+                    <div class="route-info">
+                        <div id="distance"></div>
+                        <div id="duration"></div>
+                    </div>
+                    
+                    <div class="tabs">
+                        <div class="tab active" data-tab="route-tab">Route</div>
+                        <div class="tab" data-tab="places-tab">Places</div>
+                        <div class="tab" data-tab="features-tab">Features</div>
+                    </div>
+                    
+                    <div class="tab-content active" id="route-tab">
+                        <p>Route generated successfully.</p>
+                        <div id="sampled-info"></div>
+                    </div>
+                    
+                    <div class="tab-content" id="places-tab">
+                        <div class="feature-list" id="places-list"></div>
+                    </div>
+                    
+                    <div class="tab-content" id="features-tab">
+                        <div class="feature-list" id="features-list"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="sidebar-content" id="chat-content">
+                <div class="chat-container">
+                    <div class="chat-messages" id="chat-messages">
+                        <div class="chat-message assistant">
+                            Hello! I'm MapChat, your route planning assistant. How can I help you today? You can ask me to find routes, show places along a route, or tell you about natural features you'll encounter on your journey.
+                        </div>
+                    </div>
+                    <div class="chat-input-container">
+                        <textarea class="chat-input" id="chat-input" placeholder="Ask me about routes, places, or natural features..." rows="3"></textarea>
+                        <button class="chat-send-btn" id="chat-send-btn">Send</button>
+                    </div>
+                    <div class="chat-reset-btn" id="chat-reset-btn">Reset Conversation</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Sidebar toggle handle that stays visible even when sidebar is hidden -->
+        <div class="sidebar-toggle-handle" id="sidebar-toggle-handle">
+            <span>◀</span>
+        </div>
+        
+        <div class="map-container" id="map-container">
+            <div id="map"></div>
+        </div>
+    </div>
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Application Modules -->
+    <script src="{{ url_for('static', filename='js/map.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/api.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/sidebar.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/form.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
