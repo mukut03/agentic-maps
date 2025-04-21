@@ -1,8 +1,8 @@
 import json
 from typing import Dict, Any, List, Optional
 
-from ollama_client import OllamaClient
-import prompts
+from llm.ollama_client import OllamaClient
+from utils import prompts
 
 class ClarificationAgent:
     """

@@ -2,14 +2,14 @@ import json
 import asyncio
 from typing import Dict, Any, List, Optional, Tuple
 
-from ollama_client import OllamaClient
+from llm.ollama_client import OllamaClient
 from conversation_manager import ConversationManager
 from intent_classifier import IntentClassifier
 from route_agent import RouteAgent
 from places_features_agent import PlacesFeaturesAgent
 from waypoint_agent import WaypointAgent
 from clarification_agent import ClarificationAgent
-import prompts
+from utils import prompts
 
 class ChatController:
     """
